@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Kucing Gemoy Catch! 🐾</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Quicksand:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Quicksand', sans-serif;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+            background: #0f0728;
+            overflow: hidden;
+        }
+        .title-font {
+            font-family: 'Fredoka One', cursive;
+        }
+        canvas {
+            display: block;
+            touch-action: none;
+        }
+        @keyframes softPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .animate-soft-pulse {
+            animation: softPulse 1.5s infinite ease-in-out;
+        }
+        @keyframes needleSpin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(1440deg); }
+        }
+        .spinning-needle {
+            animation: needleSpin 1.5s cubic-bezier(0.15, 0.85, 0.35, 1) forwards;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen flex flex-col items-center justify-between p-2 sm:p-4 text-white relative">
+
+    <!-- Top HUD -->
+    <div id="hud" class="w-full max-w-md flex justify-between items-center px-3 py-2 bg-slate-900/80 backdrop-blur-md rounded-2xl shadow-xl border-2 border-indigo-500/30 z-10">
+        <div class="flex items-center gap-2">
+            <span class="text-2xl filter drop-shadow">🐟</span>
+            <div>
+                <p class="text-[9px] text-pink-400 font-extrabold uppercase tracking-wider">Skor</p>
+                <p id="scoreVal" class="title-font text-xl text-yellow-300">0</p>
+            </div>
+        </div>
+        <!-- Currency / Coins -->
+        <div class="flex items-center gap-1 bg-yellow-500/20 px-2.5 py-1 rounded-xl border border-yellow-400/30 cursor-pointer" onclick="openShop(1)">
+            <span class="text-lg">🪙</span>
+            <span id="coinVal" class="title-font text-sm text-yellow-300">0</span>
+        </div>
+        <div class="flex items-center gap-3">
+            <div class="text-right">
+                <p class="text-[9px] text-indigo-300 font-extrabold uppercase tracking-wider">Nyawa</p>
+                <div id="livesContainer" class="flex gap-0.5 text-sm">❤️❤️❤️</div>
+            </div>
+            <div class="text-right">
+                <p class="text-[9px] text-yellow-400 font-extrabold uppercase tracking-wider">Rekor</p>
+                <p id="highScoreVal" class="title-font text-lg text-white">0</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Skills Status Bar -->
+    <div id="skillStatusBar" class="w-full max-w-md flex gap-2 px-1 z-10 hidden">
+        <div id="skillShieldBar" class="flex-1 bg-cyan-900/80 border border-cyan-400 px-2 py-1 rounded-xl text-[10px] text-cyan-200 flex justify-between items-center hidden">
+            <span>🛡️ Shield</span>
+            <span id="shieldTimer">8s</span>
+        </div>
+        <div id="skillMagnetBar" class="flex-1 bg-amber-900/80 border border-amber-400 px-2 py-1 rounded-xl text-[10px] text-amber-200 flex justify-between items-center hidden">
+            <span>🧲 Magnet</span>
+            <span id="magnetTimer">8s</span>
+        </div>
+    </div>
+
+    <!-- Game Canvas Wrapper -->
+    <div id="canvasContainer" class="w-full max-w-md flex-1 my-2 relative rounded-3xl overflow-hidden shadow-2xl border-4 border-pink-400 bg-gradient-to-b from-indigo-950 via-purple-950 to-pink-950 flex items-center justify-center">
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Start Screen Overlay -->
+        <div id="startScreen" class="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-20">
+            <div class="text-6xl mb-3 animate-bounce">🐱</div>
+            <h1 class="title-font text-4xl text-yellow-300 mb-1 drop-shadow-lg">Kucing Gemoy</h1>
+            <p class="text-xs text-pink-200 mb-5 max-w-xs font-semibold">Bantu Meow makan! Habiskan koinmu untuk Gacha, Skin, & Skill di Toko!</p>
+            
+            <div class="flex flex-col gap-2.5 w-full max-w-xs">
+                <button onclick="startGame()" class="title-font bg-gradient-to-r from-pink-500 to-yellow-400 text-white text-lg px-6 py-3.5 rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition transform animate-soft-pulse border-2 border-white/50 cursor-pointer">
+                    MULAI MAKAN! 🐾
+                </button>
+                <button onclick="openShop(0)" class="title-font bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm px-6 py-3 rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition transform border-2 border-white/40 cursor-pointer flex items-center justify-center gap-2">
+                    🛍️ TOKO, GACHA & PAYMENT
+                </button>
+            </div>
+        </div>
+
+        <!-- Shop & Payment Modal Overlay -->
+        <div id="shopScreen" class="absolute inset-0 bg-slate-950/95 backdrop-blur-lg flex flex-col p-4 z-30 hidden overflow-y-auto">
+            <div class="flex justify-between items-center mb-3">
+                <h2 class="title-font text-xl text-yellow-300 flex items-center gap-2">🛍️ Toko & Belanja Koin</h2>
+                <button onclick="closeShop()" class="bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-xl text-xs font-bold border border-white/20">X Tutup</button>
+            </div>
+
+            <!-- Saldo & Status No Ads -->
+            <div class="bg-yellow-500/10 p-3 rounded-2xl border border-yellow-500/30 mb-3 flex justify-between items-center">
+                <div>
+                    <span class="text-[10px] text-yellow-200 block font-bold">Koin Kamu:</span>
+                    <div class="flex items-center gap-1">
+                        <span class="text-sm">🪙</span>
+                        <span id="shopCoinVal" class="title-font text-base text-yellow-300">0</span>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <span id="noAdsStatusBadge" class="text-[10px] bg-slate-800 text-slate-300 px-2 py-1 rounded-lg border border-slate-700 font-bold">Iklan Aktif</span>
+                </div>
+            </div>
+
+            <div class="space-y-3 pb-4">
+                <!-- Tab Menu Navigasi Toko -->
+                <div class="flex gap-1 bg-slate-900/80 p-1 rounded-xl border border-white/10 text-xs font-bold">
+                    <button onclick="switchShopTab('coin')" id="tabCoinBtn" class="flex-1 py-1.5 rounded-lg bg-indigo-600 text-white transition">Top-Up</button>
+                    <button onclick="switchShopTab('spend')" id="tabSpendBtn" class="flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition">Belanja Koin</button>
+                    <button onclick="switchShopTab('vip')" id="tabVipBtn" class="flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition">No-Ads</button>
+                </div>
+
+                <!-- TAB 1: TOP UP KOIN (Uang Asli / Midtrans) -->
+                <div id="shopTabCoin" class="space-y-2">
+                    <p class="text-[10px] text-pink-400 font-extrabold uppercase tracking-wider">🪙 Top-Up Koin Instan (QRIS/E-Wallet)</p>
+                    
+                    <div class="bg-white/5 p-2.5 rounded-xl border border-white/10 flex justify-between items-center">
+                        <div>
+                            <p class="text-xs font-bold">Kantong Ikan Kecil</p>
+                            <p class="text-[10px] text-yellow-300">🪙 +150 Koin</p>
+                        </div>
+                        <button onclick="simulateRealPayment('Kantong Ikan Kecil', 'Rp 3.000', 150, 'coin')" class="bg-gradient-to-r from-green-500 to-emerald-600 hover:opacity-90 text-white text-xs px-3 py-1.5 rounded-xl font-bold">Rp 3.000</button>
+                    </div>
+
+                    <div class="bg-white/5 p-2.5 rounded-xl border border-white/10 flex justify-between items-center">
+                        <div>
+                            <p class="text-xs font-bold">Keranjang Sedang <span class="text-[9px] bg-pink-500/30 text-pink-300 px-1.5 py-0.5 rounded ml-1">Favorit ⭐</span></p>
+                            <p class="text-[10px] text-yellow-300">🪙 +400 Koin</p>
+                        </div>
+                        <button onclick="simulateRealPayment('Keranjang Ikan Sedang', 'Rp 7.500', 400, 'coin')" class="bg-gradient-to-r from-green-500 to-emerald-600 hover:opacity-90 text-white text-xs px-3 py-1.5 rounded-xl font-bold">Rp 7.500</button>
+                    </div>
+
+                    <div class="bg-white/5 p-2.5 rounded-xl border border-white/10 flex justify-between items-center">
+                        <div>
+                            <p class="text-xs font-bold">Peti Ikan Sultan</p>
+                            <p class="text-[10px] text-yellow-300">🪙 +1.000 Koin</p>
+                        </div>
+                        <button onclick="simulateRealPayment('Peti Ikan Sultan', 'Rp 15.000', 1000, 'coin')" class="bg-gradient-to-r from-green-500 to-emerald-600 hover:opacity-90 text-white text-xs px-3 py-1.5 rounded-xl font-bold">Rp 15.000</button>
+                    </div>
+                </div>
+
+                <!-- TAB 2: BELANJA PAKAI KOIN (Gacha & Skin & Skill) -->
+                <div id="shopTabSpend" class="space-y-3 hidden">
+                    <p class="text-[10px] text-yellow-400 font-extrabold uppercase tracking-wider">🛒 Habiskan Koinmu di Sini!</p>
+                    
+                    <div class="bg-gradient-to-r from-amber-900/60 to-yellow-900/60 p-3 rounded-xl border border-yellow-500/40 flex justify-between items-center">
+                        <div>
+                            <p class="text-xs font-bold text-yellow-300">🎁 Gacha Kotak Misteri</p>
+                            <p class="text-[10px] text-slate-200">Bisa dapet koin balik, shield, atau magnet!</p>
+                        </div>
+                        <button onclick="buyGachaBox()" class="bg-gradient-to-r from-yellow-500 to-amber-600 hover:opacity-90 text-white text-xs px-3 py-2 rounded-xl font-bold whitespace-nowrap">🪙 40 Koin</button>
+                    </div>
+
+                    <div class="bg-white/5 p-3 rounded-xl border border-white/10 flex justify-between items-center">
+                        <div>
+                            <p class="text-xs font-bold">🐈‍⬛ Skin Kucing Hitam VIP</p>
+                            <p class="text-[10px] text-slate-300">Buka akses skin kucing malam misterius</p>
+                        </div>
+                        <button id="buySkinCoinBtn" onclick="buySkinWithCoins('black', 250)" class="bg-pink-600 hover:bg-pink-500 text-white text-xs px-3 py-2 rounded-xl font-bold whitespace-nowrap">🪙 250</button>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="bg-white/5 p-2.5 rounded-xl border border-white/10 flex flex-col justify-between items-center text-center">
+                            <span class="text-lg">🛡️</span>
+                            <p class="text-[10px] font-bold mt-1">Beli 1x Shield</p>
+                            <button onclick="buySkillWithCoins('shield', 30)" class="mt-2 w-full bg-cyan-600 text-white text-[10px] py-1 rounded-lg font-bold">🪙 30</button>
+                        </div>
+                        <div class="bg-white/5 p-2.5 rounded-xl border border-white/10 flex flex-col justify-between items-center text-center">
+                            <span class="text-lg">🧲</span>
+                            <p class="text-[10px] font-bold mt-1">Beli 1x Magnet</p>
+                            <button onclick="buySkillWithCoins('magnet', 30)" class="mt-2 w-full bg-amber-600 text-white text-[10px] py-1 rounded-lg font-bold">🪙 30</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: NO-ADS PASS -->
+                <div id="shopTabVip" class="space-y-2 hidden">
+                    <p class="text-[10px] text-pink-400 font-extrabold uppercase tracking-wider">🚫 Langganan Bebas Iklan</p>
+                    
+                    <div class="bg-white/5 p-2.5 rounded-xl border border-white/10 flex justify-between items-center">
+                        <div>
+                            <p class="text-xs font-bold">Pass Bebas Iklan (1 Hari)</p>
+                            <p class="text-[10px] text-slate-300">Bebas pop-up iklan selama 24 jam</p>
+                        </div>
+                        <button onclick="simulateRealPayment('Pass Bebas Iklan 1 Hari', 'Rp 5.000', 1, 'no_ads_1d')" class="bg-gradient-to-r from-amber-500 to-yellow-600 hover:opacity-90 text-white text-xs px-3 py-1.5 rounded-xl font-bold">Rp 5.000</button>
+                    </div>
+
+                    <div class="bg-white/5 p-2.5 rounded-xl border border-white/10 flex justify-between items-center">
+                        <div>
+                            <p class="text-xs font-bold">Pass Bebas Iklan (7 Hari) <span class="text-[9px] bg-green-500/30 text-green-300 px-1.5 py-0.5 rounded ml-1">Hemat!</span></p>
+                            <p class="text-[10px] text-slate-300">Bebas pop-up iklan selama 7 hari</p>
+                        </div>
+                        <button onclick="simulateRealPayment('Pass Bebas Iklan 7 Hari', 'Rp 20.000', 7, 'no_ads_7d')" class="bg-gradient-to-r from-amber-500 to-yellow-600 hover:opacity-90 text-white text-xs px-3 py-1.5 rounded-xl font-bold">Rp 20.000</button>
+                    </div>
+                </div>
+
+                <!-- Skin Selector Section -->
+                <div class="pt-2 border-t border-white/10">
+                    <p class="text-[10px] text-indigo-300 font-extrabold uppercase tracking-wider mb-2">🎨 Ganti Skin Aktif</p>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="bg-white/5 p-2 rounded-xl border border-white/10 flex flex-col items-center text-center">
+                            <span class="text-xl">🐱</span>
+                            <p class="text-[10px] font-bold mt-1">Oranye</p>
+                            <button onclick="changeSkin('orange')" class="mt-1 w-full bg-slate-700 text-white text-[9px] py-1 rounded-lg font-bold">Pakai</button>
+                        </div>
+                        <div class="bg-white/5 p-2 rounded-xl border border-white/10 flex flex-col items-center text-center">
+                            <span class="text-xl">🐈‍⬛</span>
+                            <p class="text-[10px] font-bold mt-1">Hitam VIP</p>
+                            <button onclick="changeSkin('black')" class="mt-1 w-full bg-pink-500 text-white text-[9px] py-1 rounded-lg font-bold">Pakai</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SIMULASI POP-UP INTERSTITIAL AD -->
+        <div id="interstitialAdModal" class="absolute inset-0 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-50 hidden">
+            <span class="text-xs uppercase bg-red-600 text-white px-3 py-1 rounded-full font-extrabold mb-3 tracking-widest animate-pulse">📺 IKLAN SPONSOR (Interstisial)</span>
+            <div class="bg-white/10 border border-white/20 p-6 rounded-3xl w-full max-w-xs mb-6 shadow-2xl">
+                <div class="text-5xl mb-2">🎮🐱</div>
+                <h3 class="title-font text-lg text-yellow-300 mb-1">Mainkan Game Kucing Lainnya!</h3>
+                <p class="text-[11px] text-slate-300">Dukung developer agar game Kucing Gemoy tetap gratis dimainkan.</p>
+                <div class="mt-4 bg-slate-800 py-2 rounded-xl text-xs text-cyan-300 font-bold">Iklan akan ditutup dalam <span id="adCountdown">3</span> detik</div>
+            </div>
+            <button id="closeAdBtn" onclick="closeInterstitialAd()" class="title-font bg-slate-700 text-slate-400 text-xs px-6 py-2.5 rounded-xl cursor-not-allowed" disabled>
+                Tutup Iklan (Menunggu...)
+            </button>
+        </div>
+
+        <!-- Game Over Screen Overlay -->
+        <div id="gameOverScreen" class="absolute inset-0 bg-slate-950/92 backdrop-blur-md flex flex-col items-center justify-center p-4 text-center z-20 hidden">
+            <div class="text-3xl mb-0.5">😿</div>
+            <h2 class="title-font text-xl text-pink-400 mb-0.5">Game Over!</h2>
+            <p class="text-[10px] text-indigo-200 mb-1.5">Meow kehabisan nyawa!</p>
+
+            <div class="bg-white/10 backdrop-blur-md p-2.5 rounded-xl border border-white/20 mb-2 w-44 shadow-inner">
+                <p class="text-[8px] text-pink-300 font-extrabold uppercase">SKOR AKHIR</p>
+                <p id="finalScore" class="title-font text-xl text-yellow-300 my-0.5">0</p>
+                <p id="earnedCoins" class="text-[10px] text-yellow-200 font-bold">+🪙 0 Koin Didapat</p>
+                <p id="newHighScoreNotice" class="text-[9px] text-green-400 font-bold hidden mt-0.5">🎉 REKOR BARU! 🎉</p>
+            </div>
+
+            <!-- Revive Choices Container -->
+            <div id="reviveContainer" class="flex flex-col gap-1.5 w-full max-w-xs mb-2">
+                <button id="reviveAdBtn" onclick="watchAdForRevive()" class="w-full title-font bg-gradient-to-r from-cyan-600 to-blue-600 text-white text-[11px] py-2 rounded-xl shadow-md hover:scale-105 active:scale-95 transition transform border border-white/30 cursor-pointer flex items-center justify-center gap-1.5">
+                    📺 Nonton Iklan (Gratis Revive)
+                </button>
+                <button id="reviveCoinBtn" onclick="reviveWithCoins()" class="w-full title-font bg-gradient-to-r from-amber-500 to-yellow-600 text-white text-[11px] py-2 rounded-xl shadow-md hover:scale-105 active:scale-95 transition transform border border-yellow-300/50 cursor-pointer flex items-center justify-center gap-1.5">
+                    <span id="reviveCoinText">🪙 Revive Pakai 75 Koin</span> <span class="text-[8px] bg-red-600 px-1 py-0.5 rounded text-white font-bold" id="reviveMultiplierBadge">Sayang bgt!</span>
+                </button>
+            </div>
+
+            <!-- OPSI BARU: SPIN JARUM METER PENGGANDA KOIN -->
+            <div class="w-full max-w-xs bg-purple-900/60 p-2 rounded-xl border border-purple-400/40 mb-2 flex items-center justify-between">
+                <div class="text-left">
+                    <p class="text-[10px] font-bold text-yellow-300">🎰 Spin Pengganda Koin!</p>
+                    <p class="text-[9px] text-purple-200">Nonton iklan, gandakan koin ssesimu hingga 10x!</p>
+                </div>
+                <button onclick="openCoinMultiplierSpin()" class="bg-gradient-to-r from-pink-500 to-yellow-400 text-slate-950 font-extrabold text-[10px] px-3 py-2 rounded-lg shadow hover:scale-105 whitespace-nowrap">
+                    PUTAR 🎡
+                </button>
+            </div>
+
+            <div class="flex gap-2 w-full max-w-xs">
+                <button onclick="startGame()" class="flex-1 title-font bg-gradient-to-r from-yellow-400 to-pink-500 text-white text-[11px] py-2 rounded-xl shadow-lg hover:scale-105 active:scale-95 transition transform border border-white/50 cursor-pointer">
+                    MAIN LAGI 🔄
+                </button>
+                <button onclick="returnToMenu()" class="flex-1 title-font bg-slate-800 hover:bg-slate-700 text-white text-[11px] py-2 rounded-xl shadow-lg transition border border-slate-600 cursor-pointer">
+                    MENU 🏠
+                </button>
+            </div>
+        </div>
+
+        <!-- MODAL MINI-GAME SPIN JARUM METER KELIPATAN KOIN -->
+        <div id="coinMultiplierModal" class="absolute inset-0 bg-slate-950/95 backdrop-blur-lg flex flex-col items-center justify-center p-5 text-center z-50 hidden">
+            <span class="text-[10px] uppercase bg-purple-600 text-white px-3 py-1 rounded-full font-extrabold mb-2 tracking-widest">🎡 LUCKY COIN MULTIPLIER</span>
+            <p class="text-xs text-pink-200 mb-4">Putar jarum meter untuk menggandakan total koin sesimu!</p>
+
+            <!-- Visual Wheel / Meter -->
+            <div class="relative w-40 h-40 bg-gradient-to-br from-indigo-900 to-purple-900 rounded-full border-4 border-yellow-400 flex items-center justify-center shadow-2xl mb-4 overflow-hidden">
+                <div class="absolute inset-2 border-2 border-dashed border-yellow-300/40 rounded-full"></div>
+                <div class="grid grid-cols-2 gap-2 text-xs font-bold text-yellow-300 z-10">
+                    <span class="bg-black/40 p-2 rounded">2x</span>
+                    <span class="bg-black/40 p-2 rounded">3x</span>
+                    <span class="bg-black/40 p-2 rounded">5x</span>
+                    <span class="bg-black/40 p-2 rounded text-pink-400 animate-pulse">10x 🌟</span>
+                </div>
+                <!-- Jarum Meter -->
+                <div id="spinnerNeedle" class="absolute w-1 h-16 bg-red-500 bottom-1/2 left-1/2 origin-bottom transition-all duration-1000 transform -translate-x-1/2 rounded-full"></div>
+            </div>
+
+            <div id="spinResultText" class="title-font text-lg text-yellow-300 mb-4 h-6">Tekan tombol di bawah untuk putar!</div>
+
+            <div class="flex flex-col gap-2 w-full max-w-xs">
+                <button id="startSpinBtn" onclick="executeCoinSpin()" class="title-font bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xs py-3 rounded-xl shadow-lg hover:scale-105 cursor-pointer">
+                    📺 Nonton Iklan & Putar Sekarang!
+                </button>
+                <button onclick="closeCoinMultiplierSpin()" class="title-font bg-slate-800 text-slate-300 text-xs py-2 rounded-xl hover:bg-slate-700 cursor-pointer">
+                    Lewati / Kembali
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Touch Controls Footer -->
+    <div class="w-full max-w-md flex gap-3 px-2 z-10">
+        <button id="leftBtn" class="flex-1 bg-slate-800/80 hover:bg-slate-700 active:bg-slate-600 py-4 rounded-2xl text-2xl font-bold backdrop-blur-md border-2 border-indigo-500/40 shadow-xl transition flex items-center justify-center text-pink-300">
+            ⬅️
+        </button>
+        <button id="rightBtn" class="flex-1 bg-slate-800/80 hover:bg-slate-700 active:bg-slate-600 py-4 rounded-2xl text-2xl font-bold backdrop-blur-md border-2 border-indigo-500/40 shadow-xl transition flex items-center justify-center text-pink-300">
+            ➡️
+        </button>
+    </div>
+
+    <script>
+        let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
+            try {
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                let now = audioCtx.currentTime;
+
+                if (type === 'eat') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.exponentialRampToValueAtTime(800, now + 0.1);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                } else if (type === 'bomb') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.exponentialRampToValueAtTime(40, now + 0.25);
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                } else if (type === 'buy') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(600, now);
+                    osc.frequency.setValueAtTime(900, now + 0.1);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                    osc.start(now);
+                    osc.stop(now + 0.2);
+                }
+            } catch (e) {}
+        }
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const startScreen = document.getElementById('startScreen');
+        const shopScreen = document.getElementById('shopScreen');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const interstitialAdModal = document.getElementById('interstitialAdModal');
+        const adCountdownEl = document.getElementById('adCountdown');
+        const closeAdBtn = document.getElementById('closeAdBtn');
+        const noAdsStatusBadge = document.getElementById('noAdsStatusBadge');
+
+        const coinMultiplierModal = document.getElementById('coinMultiplierModal');
+        const spinnerNeedle = document.getElementById('spinnerNeedle');
+        const spinResultText = document.getElementById('spinResultText');
+        const startSpinBtn = document.getElementById('startSpinBtn');
+
+        const scoreValEl = document.getElementById('scoreVal');
+        const coinValEl = document.getElementById('coinVal');
+        const shopCoinValEl = document.getElementById('shopCoinVal');
+        const highScoreValEl = document.getElementById('highScoreVal');
+        const finalScoreEl = document.getElementById('finalScore');
+        const earnedCoinsEl = document.getElementById('earnedCoins');
+        const livesContainer = document.getElementById('livesContainer');
+        const newHighScoreNotice = document.getElementById('newHighScoreNotice');
+        const reviveCoinText = document.getElementById('reviveCoinText');
+        const reviveMultiplierBadge = document.getElementById('reviveMultiplierBadge');
+        const leftBtn = document.getElementById('leftBtn');
+        const rightBtn = document.getElementById('rightBtn');
+
+        const skillStatusBar = document.getElementById('skillStatusBar');
+        const skillShieldBar = document.getElementById('skillShieldBar');
+        const shieldTimerEl = document.getElementById('shieldTimer');
+        const skillMagnetBar = document.getElementById('skillMagnetBar');
+        const magnetTimerEl = document.getElementById('magnetTimer');
+
+        let gameState = 'START';
+        let score = 0;
+        let sessionCoinsEarned = 0;
+        let totalCoins = parseInt(localStorage.getItem('kucing_gemoy_coins')) || 50;
+        let highScore = parseInt(localStorage.getItem('kucing_gemoy_highscore')) || 0;
+        let lives = 3;
+        let gameSpeed = 3.5;
+        let spawnTimer = 0;
+        let items = [];
+        let particles = [];
+        let floatingTexts = [];
+        
+        let currentReviveCoinCost = 75;
+        let hasSpunMultiplier = false;
+
+        let screenTransitionCount = parseInt(localStorage.getItem('kucing_gemoy_screen_count')) || 0;
+        let noAdsExpiry = parseInt(localStorage.getItem('kucing_gemoy_noads_expiry')) || 0;
+
+        let currentSkin = localStorage.getItem('kucing_gemoy_skin') || 'orange';
+        let unlockedSkins = JSON.parse(localStorage.getItem('kucing_gemoy_unlocked_skins')) || ['orange'];
+        
+        let activeSkills = {
+            shield: { active: false, timeLeft: 0 },
+            magnet: { active: false, timeLeft: 0 }
+        };
+
+        let cat = {
+            x: 0, y: 0,
+            baseWidth: 60, baseHeight: 45,
+            width: 60, height: 45,
+            speed: 8, targetX: null, fatFactor: 1.0
+        };
+
+        const itemTypes = [
+            { type: 'fish', emoji: '🐟', points: 10, weight: 48, radius: 20 },
+            { type: 'sushi', emoji: '🍣', points: 20, weight: 24, radius: 20 },
+            { type: 'coin', emoji: '🪙', points: 5, coinVal: 10, weight: 12, radius: 18 },
+            { type: 'bomb', emoji: '💣', points: -1, weight: 16, radius: 20 }
+        ];
+
+        highScoreValEl.innerText = highScore;
+        coinValEl.innerText = totalCoins;
+        checkNoAdsStatus();
+        updateSpendShopUI();
+
+        function checkNoAdsStatus() {
+            let now = Date.now();
+            if (now < noAdsExpiry) {
+                let sisaJam = Math.ceil((noAdsExpiry - now) / (1000 * 60 * 60));
+                noAdsStatusBadge.innerText = `🛡️ Bebas Iklan Aktif (~${sisaJam} Jam)`;
+                noAdsStatusBadge.className = 'text-[10px] bg-green-900 text-green-200 px-2.5 py-1 rounded-lg border border-green-700 font-bold';
+                return true;
+            } else {
+                noAdsStatusBadge.innerText = 'Iklan Aktif';
+                noAdsStatusBadge.className = 'text-[10px] bg-slate-800 text-slate-300 px-2 py-1 rounded-lg border border-slate-700 font-bold';
+                return false;
+            }
+        }
+
+        function trackScreenTransition() {
+            if (checkNoAdsStatus()) return;
+            screenTransitionCount++;
+            localStorage.setItem('kucing_gemoy_screen_count', screenTransitionCount);
+            if (screenTransitionCount % 5 === 0) {
+                triggerInterstitialAd();
+            }
+        }
+
+        function triggerInterstitialAd() {
+            interstitialAdModal.classList.remove('hidden');
+            closeAdBtn.disabled = true;
+            closeAdBtn.className = 'title-font bg-slate-700 text-slate-400 text-xs px-6 py-2.5 rounded-xl cursor-not-allowed';
+            let timeLeft = 3;
+            adCountdownEl.innerText = timeLeft;
+            let timer = setInterval(() => {
+                timeLeft--;
+                adCountdownEl.innerText = timeLeft;
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    closeAdBtn.disabled = false;
+                    closeAdBtn.className = 'title-font bg-gradient-to-r from-red-500 to-pink-600 text-white text-xs px-6 py-2.5 rounded-xl hover:scale-105 cursor-pointer shadow-lg';
+                    closeAdBtn.innerText = 'Tutup Iklan [X]';
+                }
+            }, 1000);
+        }
+
+        function closeInterstitialAd() {
+            interstitialAdModal.classList.add('hidden');
+        }
+
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            if (gameState === 'START') {
+                cat.x = canvas.width / 2 - cat.width / 2;
+                cat.y = canvas.height - cat.height - 30;
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        let keys = { left: false, right: false };
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = true;
+            if (e.key === 'ArrowRight' || e.key === 'd') keys.right = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = false;
+            if (e.key === 'ArrowRight' || e.key === 'd') keys.right = false;
+        });
+
+        function bindTouchButton(btn, direction) {
+            const press = (e) => { e.preventDefault(); initAudio(); keys[direction] = true; };
+            const release = (e) => { e.preventDefault(); keys[direction] = false; };
+            btn.addEventListener('touchstart', press, { passive: false });
+            btn.addEventListener('touchend', release, { passive: false });
+            btn.addEventListener('mousedown', press);
+            btn.addEventListener('mouseup', release);
+            btn.addEventListener('mouseleave', release);
+        }
+        bindTouchButton(leftBtn, 'left');
+        bindTouchButton(rightBtn, 'right');
+
+        canvas.addEventListener('pointerdown', (e) => {
+            initAudio();
+            const rect = canvas.getBoundingClientRect();
+            cat.targetX = e.clientX - rect.left - cat.width / 2;
+        });
+        canvas.addEventListener('pointermove', (e) => {
+            if (e.buttons > 0) {
+                const rect = canvas.getBoundingClientRect();
+                cat.targetX = e.clientX - rect.left - cat.width / 2;
+            }
+        });
+        canvas.addEventListener('pointerup', () => { cat.targetX = null; });
+
+        function openShop(tabIndex = 0) {
+            initAudio();
+            trackScreenTransition();
+            shopCoinValEl.innerText = totalCoins;
+            checkNoAdsStatus();
+            updateSpendShopUI();
+            shopScreen.classList.remove('hidden');
+            if (tabIndex === 1) switchShopTab('spend');
+        }
+
+        function closeShop() {
+            shopScreen.classList.add('hidden');
+            coinValEl.innerText = totalCoins;
+        }
+
+        function switchShopTab(tabName) {
+            const tabCoin = document.getElementById('shopTabCoin');
+            const tabSpend = document.getElementById('shopTabSpend');
+            const tabVip = document.getElementById('shopTabVip');
+            
+            const btnCoin = document.getElementById('tabCoinBtn');
+            const btnSpend = document.getElementById('tabSpendBtn');
+            const btnVip = document.getElementById('tabVipBtn');
+
+            tabCoin.classList.add('hidden');
+            tabSpend.classList.add('hidden');
+            tabVip.classList.add('hidden');
+            btnCoin.className = 'flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition';
+            btnSpend.className = 'flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition';
+            btnVip.className = 'flex-1 py-1.5 rounded-lg text-slate-400 hover:text-white transition';
+
+            if (tabName === 'coin') {
+                tabCoin.classList.remove('hidden');
+                btnCoin.className = 'flex-1 py-1.5 rounded-lg bg-indigo-600 text-white transition';
+            } else if (tabName === 'spend') {
+                tabSpend.classList.remove('hidden');
+                btnSpend.className = 'flex-1 py-1.5 rounded-lg bg-indigo-600 text-white transition';
+            } else if (tabName === 'vip') {
+                tabVip.classList.remove('hidden');
+                btnVip.className = 'flex-1 py-1.5 rounded-lg bg-indigo-600 text-white transition';
+            }
+        }
+
+        function updateSpendShopUI() {
+            const buySkinBtn = document.getElementById('buySkinCoinBtn');
+            if (unlockedSkins.includes('black')) {
+                buySkinBtn.innerText = 'Dimiliki';
+                buySkinBtn.className = 'bg-slate-700 text-slate-400 text-xs px-3 py-2 rounded-xl font-bold cursor-default';
+            }
+        }
+
+        function buySkinWithCoins(skinName, cost) {
+            initAudio();
+            if (unlockedSkins.includes(skinName)) {
+                alert("Skin Kucing Hitam sudah dimiliki!");
+                return;
+            }
+            if (totalCoins >= cost) {
+                totalCoins -= cost;
+                unlockedSkins.push(skinName);
+                currentSkin = skinName;
+                localStorage.setItem('kucing_gemoy_coins', totalCoins);
+                localStorage.setItem('kucing_gemoy_skin', currentSkin);
+                localStorage.setItem('kucing_gemoy_unlocked_skins', JSON.stringify(unlockedSkins));
+                shopCoinValEl.innerText = totalCoins;
+                coinValEl.innerText = totalCoins;
+                playSound('buy');
+                updateSpendShopUI();
+                alert("🎉 Berhasil membeli Skin Kucing Hitam VIP pakai koin!");
+            } else {
+                alert("Koin kamu kurang! Tangkap lebih banyak ikan & koin di game.");
+            }
+        }
+
+        function buyGachaBox() {
+            initAudio();
+            let cost = 40;
+            if (totalCoins >= cost) {
+                totalCoins -= cost;
+                localStorage.setItem('kucing_gemoy_coins', totalCoins);
+                shopCoinValEl.innerText = totalCoins;
+                coinValEl.innerText = totalCoins;
+                playSound('buy');
+
+                let rand = Math.random();
+                if (rand < 0.4) {
+                    let rewardCoin = 60 + Math.floor(Math.random() * 40);
+                    totalCoins += rewardCoin;
+                    localStorage.setItem('kucing_gemoy_coins', totalCoins);
+                    shopCoinValEl.innerText = totalCoins;
+                    alert(`🎁 HOKI! Gacha Box Berisi Bonus +${rewardCoin} Koin!`);
+                } else if (rand < 0.7) {
+                    activeSkills.shield.active = true;
+                    activeSkills.shield.timeLeft = 15;
+                    skillStatusBar.classList.remove('hidden');
+                    skillShieldBar.classList.remove('hidden');
+                    alert(`🎁 Gacha Box Berisi Shield Aktif 15 Detik!`);
+                    closeShop();
+                } else {
+                    activeSkills.magnet.active = true;
+                    activeSkills.magnet.timeLeft = 15;
+                    skillStatusBar.classList.remove('hidden');
+                    skillMagnetBar.classList.remove('hidden');
+                    alert(`🎁 Gacha Box Berisi Magnet Aktif 15 Detik!`);
+                    closeShop();
+                }
+            } else {
+                alert("Koin kurang! Butuh 40 koin untuk buka Gacha Box.");
+            }
+        }
+
+        function buySkillWithCoins(skillType, cost) {
+            initAudio();
+            if (totalCoins >= cost) {
+                totalCoins -= cost;
+                localStorage.setItem('kucing_gemoy_coins', totalCoins);
+                shopCoinValEl.innerText = totalCoins;
+                coinValEl.innerText = totalCoins;
+                playSound('buy');
+
+                activeSkills[skillType].active = true;
+                activeSkills[skillType].timeLeft = 12;
+                skillStatusBar.classList.remove('hidden');
+                if (skillType === 'shield') skillShieldBar.classList.remove('hidden');
+                if (skillType === 'magnet') skillMagnetBar.classList.remove('hidden');
+
+                closeShop();
+                alert(`⚡ Skill ${skillType.toUpperCase()} berhasil diaktifkan selama 12 detik!`);
+            } else {
+                alert("Koin kamu kurang!");
+            }
+        }
+
+        function simulateRealPayment(itemName, priceTag, rewardValue, type) {
+            initAudio();
+            let confirmPay = confirm(`💳 Gateway Pembayaran Midtrans\n\nProduk: ${itemName}\nHarga: ${priceTag}\n\nLanjutkan pembayaran instan via QRIS / GoPay / DANA?`);
+            if (confirmPay) {
+                playSound('buy');
+                if (type === 'coin') {
+                    totalCoins += rewardValue;
+                    localStorage.setItem('kucing_gemoy_coins', totalCoins);
+                    shopCoinValEl.innerText = totalCoins;
+                    alert(`✅ Pembayaran Berhasil!\n+${rewardValue} Koin telah ditambahkan.`);
+                } else if (type === 'no_ads_1d' || type === 'no_ads_7d') {
+                    let days = rewardValue;
+                    noAdsExpiry = Date.now() + (days * 24 * 60 * 60 * 1000);
+                    localStorage.setItem('kucing_gemoy_noads_expiry', noAdsExpiry);
+                    checkNoAdsStatus();
+                    alert(`⭐ Pass Bebas Iklan ${days} Hari Aktif!`);
+                }
+            }
+        }
+
+        function changeSkin(skinName) {
+            initAudio();
+            if (skinName === 'orange' || unlockedSkins.includes(skinName)) {
+                currentSkin = skinName;
+                localStorage.setItem('kucing_gemoy_skin', currentSkin);
+                alert(`Skin diganti ke ${skinName === 'black' ? 'Kucing Hitam VIP' : 'Oranye Klasik'}!`);
+            } else {
+                alert("Skin ini belum dimiliki! Beli dulu pakai koin di tab 'Belanja Koin'.");
+            }
+        }
+
+        function startGame() {
+            initAudio();
+            trackScreenTransition();
+            score = 0;
+            sessionCoinsEarned = 0;
+            lives = 3;
+            gameSpeed = 3.8;
+            cat.fatFactor = 1.0;
+            updateCatSize();
+            items = [];
+            particles = [];
+            floatingTexts = [];
+            
+            currentReviveCoinCost = 75;
+            hasSpunMultiplier = false;
+
+            scoreValEl.innerText = score;
+            updateLivesDisplay();
+            
+            cat.x = canvas.width / 2 - cat.width / 2;
+            cat.y = canvas.height - cat.height - 30;
+            cat.targetX = null;
+
+            startScreen.classList.add('hidden');
+            shopScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+            coinMultiplierModal.classList.add('hidden');
+            gameState = 'PLAYING';
+        }
+
+        function returnToMenu() {
+            trackScreenTransition();
+            gameOverScreen.classList.add('hidden');
+            coinMultiplierModal.classList.add('hidden');
+            startScreen.classList.remove('hidden');
+            gameState = 'START';
+        }
+
+        function updateCatSize() {
+            let targetFactor = 1.0 + Math.min(0.8, score / 400);
+            cat.fatFactor = targetFactor;
+            cat.width = cat.baseWidth * cat.fatFactor;
+            cat.height = cat.baseHeight * cat.fatFactor;
+        }
+
+        function updateLivesDisplay() {
+            let hearts = '';
+            for (let i = 0; i < lives; i++) hearts += '❤️';
+            livesContainer.innerText = hearts;
+        }
+
+        function spawnItem() {
+            let rand = Math.random() * 100;
+            let cumulativeWeight = 0;
+            let chosen = itemTypes[0];
+
+            for (let item of itemTypes) {
+                cumulativeWeight += item.weight;
+                if (rand <= cumulativeWeight) {
+                    chosen = item;
+                    break;
+                }
+            }
+
+            let radius = chosen.radius;
+            let x = Math.random() * (canvas.width - radius * 2) + radius;
+            items.push({
+                x: x, y: -30,
+                vy: (Math.random() * 1.5 + gameSpeed),
+                type: chosen.type,
+                emoji: chosen.emoji,
+                points: chosen.points,
+                coinVal: chosen.coinVal || 0,
+                radius: radius,
+                rotation: 0,
+                vRot: (Math.random() - 0.5) * 0.04
+            });
+        }
+
+        function addParticles(x, y, isBomb) {
+            for (let i = 0; i < 8; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 7,
+                    vy: (Math.random() - 0.5) * 7 - 2,
+                    alpha: 1,
+                    color: isBomb ? '#ef4444' : '#fde047',
+                    size: Math.random() * 6 + 4
+                });
+            }
+        }
+
+        function addFloatingText(x, y, text, color) {
+            floatingTexts.push({ x: x, y: y, text: text, alpha: 1, color: color, vy: -1.8 });
+        }
+
+        setInterval(() => {
+            if (gameState === 'PLAYING') {
+                let anyActive = false;
+                ['shield', 'magnet'].forEach(s => {
+                    if (activeSkills[s].active) {
+                        activeSkills[s].timeLeft--;
+                        anyActive = true;
+                        if (s === 'shield') {
+                            shieldTimerEl.innerText = activeSkills[s].timeLeft + 's';
+                            if (activeSkills[s].timeLeft <= 0) {
+                                activeSkills[s].active = false;
+                                skillShieldBar.classList.add('hidden');
+                            }
+                        }
+                        if (s === 'magnet') {
+                            magnetTimerEl.innerText = activeSkills[s].timeLeft + 's';
+                            if (activeSkills[s].timeLeft <= 0) {
+                                activeSkills[s].active = false;
+                                skillMagnetBar.classList.add('hidden');
+                            }
+                        }
+                    }
+                });
+                if (!anyActive) skillStatusBar.classList.add('hidden');
+            }
+        }, 1000);
+
+        function update() {
+            if (gameState !== 'PLAYING') return;
+
+            if (cat.targetX !== null) {
+                let diff = cat.targetX - cat.x;
+                if (Math.abs(diff) < cat.speed) {
+                    cat.x = cat.targetX;
+                    cat.targetX = null;
+                } else {
+                    cat.x += Math.sign(diff) * cat.speed;
+                }
+            } else {
+                if (keys.left) cat.x -= cat.speed;
+                if (keys.right) cat.x += cat.speed;
+            }
+
+            if (cat.x < 0) cat.x = 0;
+            if (cat.x > canvas.width - cat.width) cat.x = canvas.width - cat.width;
+
+            let catCenterX = cat.x + cat.width / 2;
+            let catCenterY = cat.y + cat.height / 2;
+
+            if (activeSkills.magnet.active) {
+                items.forEach(it => {
+                    if (it.type !== 'bomb') {
+                        let dx = catCenterX - it.x;
+                        let dy = catCenterY - it.y;
+                        it.x += dx * 0.08;
+                        it.y += dy * 0.08;
+                    }
+                });
+            }
+
+            spawnTimer++;
+            if (spawnTimer > Math.max(18, 50 - Math.floor(score / 40))) {
+                spawnItem();
+                spawnTimer = 0;
+            }
+
+            gameSpeed = 3.8 + Math.floor(score / 80) * 0.4;
+
+            for (let i = items.length - 1; i >= 0; i--) {
+                let it = items[i];
+                it.y += it.vy;
+                it.rotation += it.vRot;
+
+                let dist = Math.hypot(it.x - catCenterX, it.y - catCenterY);
+
+                if (dist < it.radius + cat.width / 3) {
+                    if (it.type === 'bomb') {
+                        if (activeSkills.shield.active) {
+                            addFloatingText(it.x, it.y, '🛡️ BLOCKED!', '#22d3ee');
+                            playSound('buy');
+                        } else {
+                            lives--;
+                            playSound('bomb');
+                            updateLivesDisplay();
+                            addParticles(it.x, it.y, true);
+                            addFloatingText(it.x, it.y, '-1 ❤️', '#ef4444');
+                            if (lives <= 0) {
+                                endGame();
+                            }
+                        }
+                    } else if (it.type === 'coin') {
+                        sessionCoinsEarned += it.coinVal;
+                        totalCoins += it.coinVal;
+                        localStorage.setItem('kucing_gemoy_coins', totalCoins);
+                        coinValEl.innerText = totalCoins;
+                        playSound('eat');
+                        addParticles(it.x, it.y, false);
+                        addFloatingText(it.x, it.y, `+${it.coinVal} 🪙`, '#facc15');
+                    } else {
+                        score += it.points;
+                        scoreValEl.innerText = score;
+                        playSound('eat');
+                        updateCatSize();
+                        addParticles(it.x, it.y, false);
+                        addFloatingText(it.x, it.y, `+${it.points}`, '#fde047');
+                    }
+                    items.splice(i, 1);
+                    continue;
+                }
+
+                if (it.y > canvas.height + 40) {
+                    items.splice(i, 1);
+                }
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx; p.y += p.vy; p.alpha -= 0.03;
+                if (p.alpha <= 0) particles.splice(i, 1);
+            }
+
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                let ft = floatingTexts[i];
+                ft.y += ft.vy; ft.alpha -= 0.02;
+                if (ft.alpha <= 0) floatingTexts.splice(i, 1);
+            }
+        }
+
+        function drawCat() {
+            ctx.save();
+            let cx = cat.x + cat.width / 2;
+            let cy = cat.y + cat.height / 2;
+            let scale = cat.fatFactor;
+
+            let bodyColor = currentSkin === 'black' ? '#1e293b' : '#f97316';
+            let bellyColor = currentSkin === 'black' ? '#cbd5e1' : '#fffbeb';
+
+            ctx.fillStyle = bodyColor;
+            ctx.beginPath();
+            ctx.ellipse(cx, cy + (5 * scale), cat.width / 2, cat.height / 2 - (4 * scale), 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = bellyColor;
+            ctx.beginPath();
+            ctx.ellipse(cx, cy + (8 * scale), cat.width / 3.2, cat.height / 3.2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = bodyColor;
+            ctx.beginPath();
+            ctx.arc(cx, cat.y + (12 * scale), 18 * scale, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(cx - (15 * scale), cat.y + (3 * scale));
+            ctx.lineTo(cx - (22 * scale), cat.y - (8 * scale));
+            ctx.lineTo(cx - (7 * scale), cat.y + (3 * scale));
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(cx + (15 * scale), cat.y + (3 * scale));
+            ctx.lineTo(cx + (22 * scale), cat.y - (8 * scale));
+            ctx.lineTo(cx + (7 * scale), cat.y + (3 * scale));
+            ctx.fill();
+
+            ctx.fillStyle = '#f472b6';
+            ctx.beginPath();
+            ctx.moveTo(cx - (13 * scale), cat.y + (2 * scale));
+            ctx.lineTo(cx - (18 * scale), cat.y - (5 * scale));
+            ctx.lineTo(cx - (8 * scale), cat.y + (2 * scale));
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(cx + (13 * scale), cat.y + (2 * scale));
+            ctx.lineTo(cx + (18 * scale), cat.y - (5 * scale));
+            ctx.lineTo(cx + (8 * scale), cat.y + (2 * scale));
+            ctx.fill();
+
+            ctx.strokeStyle = currentSkin === 'black' ? '#94a3b8' : '#371d10';
+            ctx.lineWidth = Math.max(2, 2.5 * scale);
+            ctx.lineCap = 'round';
+
+            ctx.beginPath();
+            ctx.moveTo(cx - (8 * scale), cat.y + (10 * scale));
+            ctx.lineTo(cx - (4 * scale), cat.y + (6 * scale));
+            ctx.lineTo(cx - (1 * scale), cat.y + (10 * scale));
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(cx + (1 * scale), cat.y + (10 * scale));
+            ctx.lineTo(cx + (4 * scale), cat.y + (6 * scale));
+            ctx.lineTo(cx + (8 * scale), cat.y + (10 * scale));
+            ctx.stroke();
+
+            if (activeSkills.shield.active) {
+                ctx.strokeStyle = '#22d3ee';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(cx, cy, cat.width / 1.4, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+            for (let i = 0; i < 15; i++) {
+                let bx = (i * 47 + Date.now() * 0.02) % canvas.width;
+                let by = (i * 73 + Date.now() * 0.01) % canvas.height;
+                ctx.beginPath();
+                ctx.arc(bx, by, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            for (let it of items) {
+                ctx.save();
+                ctx.translate(it.x, it.y);
+                ctx.rotate(it.rotation);
+
+                ctx.fillStyle = it.type === 'bomb' ? '#7f1d1d' : '#1e1b4b';
+                ctx.strokeStyle = it.type === 'bomb' ? '#f87171' : '#facc15';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.arc(0, 0, it.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.font = '22px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(it.emoji, 0, 1);
+                ctx.restore();
+            }
+
+            drawCat();
+
+            for (let p of particles) {
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+
+            for (let ft of floatingTexts) {
+                ctx.save();
+                ctx.globalAlpha = ft.alpha;
+                ctx.font = 'bold 15px "Fredoka One", cursive';
+                ctx.fillStyle = ft.color;
+                ctx.textAlign = 'center';
+                ctx.fillText(ft.text, ft.x, ft.y);
+                ctx.restore();
+            }
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        function endGame() {
+            gameState = 'GAMEOVER';
+            trackScreenTransition();
+            finalScoreEl.innerText = score;
+            earnedCoinsEl.innerText = `+🪙 ${sessionCoinsEarned} Koin Didapat`;
+            
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('kucing_gemoy_highscore', highScore);
+                highScoreValEl.innerText = highScore;
+                newHighScoreNotice.classList.remove('hidden');
+            } else {
+                newHighScoreNotice.classList.add('hidden');
+            }
+
+            reviveCoinText.innerText = `🪙 Revive Pakai ${currentReviveCoinCost} Koin`;
+            reviveMultiplierBadge.innerText = currentReviveCoinCost > 75 ? 'Makin Mahal!' : 'Sayang bgt!';
+
+            gameOverScreen.classList.remove('hidden');
+        }
+
+        function watchAdForRevive() {
+            initAudio();
+            let confirmAd = confirm("📺 Simulasi Iklan Rewarded: Tonton video singkat untuk revive (hidup lagi dengan 1 nyawa)?");
+            if (confirmAd) {
+                executeRevive();
+            }
+        }
+
+        function reviveWithCoins() {
+            initAudio();
+            if (totalCoins >= currentReviveCoinCost) {
+                let confirmCoin = confirm(`🪙 Konfirmasi Revive\n\nHarga revive saat ini: ${currentReviveCoinCost} Koin.\nLanjutkan?`);
+                if (confirmCoin) {
+                    totalCoins -= currentReviveCoinCost;
+                    localStorage.setItem('kucing_gemoy_coins', totalCoins);
+                    coinValEl.innerText = totalCoins;
+                    playSound('buy');
+                    currentReviveCoinCost += 25; 
+                    executeRevive();
+                }
+            } else {
+                alert(`❌ Koin tidak cukup!\nKamu butuh ${currentReviveCoinCost} Koin (Sisa koin: ${totalCoins}).`);
+            }
+        }
+
+        function executeRevive() {
+            lives = 1;
+            updateLivesDisplay();
+            gameOverScreen.classList.add('hidden');
+            gameState = 'PLAYING';
+            addFloatingText(canvas.width / 2, canvas.height / 2, '✨ REVIVED! ✨', '#34d399');
+        }
+
+        // --- FITUR SPIN PENGGANDA KOIN ---
+        function openCoinMultiplierSpin() {
+            initAudio();
+            if (hasSpunMultiplier) {
+                alert("Kamu sudah menggunakan Spin Pengganda Koin di sesi ini!");
+                return;
+            }
+            spinResultText.innerText = "Tekan tombol di bawah untuk putar!";
+            spinnerNeedle.style.transform = "translateX(-50%) rotate(0deg)";
+            coinMultiplierModal.classList.remove('hidden');
+        }
+
+        function closeCoinMultiplierSpin() {
+            coinMultiplierModal.classList.add('hidden');
+        }
+
+        function executeCoinSpin() {
+            initAudio();
+            let confirmAd = confirm("📺 Tonton Iklan Rewarded untuk memutar Jarum Meter Pengganda Koin?");
+            if (confirmAd) {
+                playSound('buy');
+                startSpinBtn.disabled = true;
+                spinResultText.innerText = "Memutar jarum meter...";
+
+                // Tentukan hasil random (2x, 3x, 5x, atau 10x)
+                let multipliers = [2, 3, 5, 10];
+                let weights = [50, 30, 15, 5]; // Peluang 10x lebih kecil biar greget
+                let randW = Math.random() * 100;
+                let cumulative = 0;
+                let chosenMultiplier = 2;
+
+                for (let i = 0; i < multipliers.length; i++) {
+                    cumulative += weights[i];
+                    if (randW <= cumulative) {
+                        chosenMultiplier = multipliers[i];
+                        break;
+                    }
+                }
+
+                // Rotasi jarum acak ke arah tertentu
+                let targetDegrees = 360 * 4 + (chosenMultiplier === 2 ? 45 : chosenMultiplier === 3 ? 135 : chosenMultiplier === 5 ? 225 : 315);
+                spinnerNeedle.style.transform = `translateX(-50%) rotate(${targetDegrees}deg)`;
+                spinnerNeedle.classList.add('spinning-needle');
+
+                setTimeout(() => {
+                    spinnerNeedle.classList.remove('spinning-needle');
+                    let bonusCoins = sessionCoinsEarned * (chosenMultiplier - 1); // Tambahan selisih kelipatan
+                    totalCoins += bonusCoins;
+                    sessionCoinsEarned *= chosenMultiplier;
+                    localStorage.setItem('kucing_gemoy_coins', totalCoins);
+                    coinValEl.innerText = totalCoins;
+                    earnedCoinsEl.innerText = `+🪙 ${sessionCoinsEarned} Koin Didapat (${chosenMultiplier}x)!`;
+
+                    spinResultText.innerText = `🎉 HOKI! Dapat Kelipatan ${chosenMultiplier}x (+${bonusCoins} Koin)!`;
+                    hasSpunMultiplier = true;
+
+                    setTimeout(() => {
+                        coinMultiplierModal.classList.add('hidden');
+                        startSpinBtn.disabled = false;
+                    }, 2000);
+                }, 1600);
+            }
+        }
+
+        requestAnimationFrame(loop);
+    </script>
+</body>
+</html>
